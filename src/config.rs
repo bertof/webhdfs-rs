@@ -1,9 +1,9 @@
 //! File-based configuration.
-//! 
-//! 1. Confiuration is read from one of the configuration files when `HdfsClientBuilder::from_config` or 
-//!    `HdfsClientBuilder::from_config` is called. The configuration files are never read or used unless 
+//!
+//! 1. Confiuration is read from one of the configuration files when `HdfsClientBuilder::from_config` or
+//!    `HdfsClientBuilder::from_config` is called. The configuration files are never read or used unless
 //!    explicitly requested.
-//! 2. There are 3 locations where the library looks for the configuration information, in the order as 
+//! 2. There are 3 locations where the library looks for the configuration information, in the order as
 //!    listed below. The search is stopped on first file found, and this solely file is used. No configuration
 //!    merging is currently supported.
 //!    - If 'WEBHDFS_CONFIG' environment variable is set, then the location specfied by it is opened
@@ -13,29 +13,35 @@
 //! 3. If a file is found but is either unreadable or unparseable, then the library panics.
 //! 4. All the configuration fields are optional, except for the entrypoint.
 //! 5. Use `write_sample_config` to get config sample
-//! 
-use std::fs::read;
-use std::path::Path;
-use std::io::{BufRead, BufReader, Read};
-use std::time::Duration;
-use std::collections::HashMap;
-use http::Uri;
+//!
 use crate::error::*;
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use http::Uri;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
+use std::fs::read;
+use std::io::{BufRead, BufReader, Read};
+use std::path::Path;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct UriW {
-    uri: Uri
+    uri: Uri,
 }
 
 impl UriW {
-    pub fn new(uri: Uri) -> Self { Self { uri } }
-    pub fn into_uri(self) -> Uri { self.uri }
+    pub fn new(uri: Uri) -> Self {
+        Self { uri }
+    }
+    pub fn into_uri(self) -> Uri {
+        self.uri
+    }
 }
 
 impl<'de> Deserialize<'de> for UriW {
     fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
-    where D: Deserializer<'de> {
+    where
+        D: Deserializer<'de>,
+    {
         let s: String = Deserialize::deserialize(deserializer)?;
         let uri: Uri = s.parse().map_err(serde::de::Error::custom)?;
         Ok(UriW { uri })
@@ -44,7 +50,9 @@ impl<'de> Deserialize<'de> for UriW {
 
 impl Serialize for UriW {
     fn serialize<S>(&self, serializer: S) -> StdResult<S::Ok, S::Error>
-    where S: Serializer {
+    where
+        S: Serializer,
+    {
         serializer.serialize_str(&self.uri.to_string())
     }
 }
@@ -58,11 +66,11 @@ pub struct HttpsConfig {
     pub identity_password: Option<String>,
     pub min_protocol_version: Option<String>,
     pub max_protocol_version: Option<String>,
-    pub root_certificates: Option<Vec<String>>
+    pub root_certificates: Option<Vec<String>>,
 }
 
 impl HttpsConfig {
-    pub fn new() -> Self { 
+    pub fn new() -> Self {
         Self {
             danger_accept_invalid_certs: None,
             danger_accept_invalid_hostnames: None,
@@ -71,7 +79,7 @@ impl HttpsConfig {
             identity_password: None,
             min_protocol_version: None,
             max_protocol_version: None,
-            root_certificates: None        
+            root_certificates: None,
         }
     }
 }
@@ -85,12 +93,12 @@ pub struct Config {
     pub doas: Option<String>,
     pub dt: Option<String>,
     pub natmap: Option<HashMap<String, String>>,
-    pub https_config: Option<HttpsConfig>
+    pub https_config: Option<HttpsConfig>,
 }
 
 impl Config {
     pub fn new(uri: Uri) -> Self {
-        Self { 
+        Self {
             entrypoint: UriW::new(uri),
             alt_entrypoint: None,
             default_timeout: None,
@@ -98,7 +106,7 @@ impl Config {
             doas: None,
             dt: None,
             natmap: None,
-            https_config: None
+            https_config: None,
         }
     }
 }
@@ -167,9 +175,10 @@ pub fn read_config() -> Config {
 }
 
 pub fn read_config_opt() -> Option<Config> {
-    read_env_config().expect("Configuration error (file specified by WEBHDFS_CONFIG environment var)")
-    .or(read_local_config().expect("Configuration error (webhdfs.toml in CWD)"))
-    .or(read_user_config().expect("Configuration error (.webhdfs.toml in homedir)"))
+    read_env_config()
+        .expect("Configuration error (file specified by WEBHDFS_CONFIG environment var)")
+        .or(read_local_config().expect("Configuration error (webhdfs.toml in CWD)"))
+        .or(read_user_config().expect("Configuration error (.webhdfs.toml in homedir)"))
 }
 
 pub fn write_config(path: &Path, c: &Config, new_file: bool) {
@@ -203,11 +212,16 @@ pub fn write_sample_config() {
 #[inline]
 pub fn split_kv(l: String) -> Result<(String, String)> {
     let mut fs = l.splitn(2, "=");
-    let a = fs.next().ok_or_else(|| app_error!(generic "cannot read entry key: {}", l))?.to_owned();
-    let b = fs.next().ok_or_else(|| app_error!(generic "cannot read entry value: {}", l))?.to_owned();
+    let a = fs
+        .next()
+        .ok_or_else(|| app_error!(generic "cannot read entry key: {}", l))?
+        .to_owned();
+    let b = fs
+        .next()
+        .ok_or_else(|| app_error!(generic "cannot read entry value: {}", l))?
+        .to_owned();
     Ok((a, b))
 }
-
 
 /// Reads an object consisting of "key=value" pairs
 #[inline]
@@ -228,15 +242,17 @@ bigtop1.vagrant:50070=localhost:51070
 bigtop1.vagrant:50075=localhost:51075
 ";
     let r = read_kv_lines(&input[..]).unwrap();
-    assert_eq!(r.get("bigtop1.vagrant:50070").map(|r| r.as_ref()), Some("localhost:51070"));
-    assert_eq!(r.get("bigtop1.vagrant:50075").map(|r| r.as_ref()), Some("localhost:51075"));
+    assert_eq!(
+        r.get("bigtop1.vagrant:50070").map(|r| r.as_ref()),
+        Some("localhost:51070")
+    );
+    assert_eq!(
+        r.get("bigtop1.vagrant:50075").map(|r| r.as_ref()),
+        Some("localhost:51075")
+    );
 }
-
 
 #[inline]
 pub fn read_kv_file(path: &str) -> Result<HashMap<String, String>> {
     read_kv_lines(std::fs::File::open(path).aerr("cannot open natmap")?)
 }
-
-
-

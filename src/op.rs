@@ -11,7 +11,7 @@ pub(crate) enum Op {
     MKDIRS,
     RENAME,
     CREATESYMLINK,
-    DELETE
+    DELETE,
 }
 
 impl Op {
@@ -27,7 +27,7 @@ impl Op {
             MKDIRS => "MKDIRS",
             RENAME => "RENAME",
             CREATESYMLINK => "CREATESYMLINK",
-            DELETE => "DELETE"
+            DELETE => "DELETE",
         }
     }
 }
@@ -56,7 +56,7 @@ pub(crate) enum OpArg {
     /// `[&createParent=<true|false>]`
     CreateParent(bool),
     /// `[&recursive=<true|false>]`
-    Recursive(bool)
+    Recursive(bool),
 }
 
 impl OpArg {
@@ -72,7 +72,7 @@ impl OpArg {
             Replication(v) => qe.add_pi("replication", *v as i64),
             Permission(v) => qe.add_po("permission", *v),
             Sources(v) => qe.add_pv("sources", &v.join(",")),
-            Destination(v)=> qe.add_pv("destination", v),
+            Destination(v) => qe.add_pv("destination", v),
             CreateParent(v) => qe.add_pb("createParent", *v),
             Recursive(v) => qe.add_pb("recursive", *v),
         }
@@ -81,36 +81,57 @@ impl OpArg {
 
 macro_rules! opt {
     ($tag:ident, $tp:ty, $op_tag:ident) => {
-        pub fn $tag(mut self, v:$tp) -> Self { self.o.push(OpArg::$op_tag(v)); self }
+        pub fn $tag(mut self, v: $tp) -> Self {
+            self.o.push(OpArg::$op_tag(v));
+            self
+        }
     };
 }
 
 /// Define option setters in the option builder
 macro_rules! opts {
     // `[&offset=<LONG>]`
-    (offset) => { opt! { offset, i64, Offset } };
+    (offset) => {
+        opt! { offset, i64, Offset }
+    };
     // `[&length=<LONG>]`
-    (length) => { opt! { length, i64, Length } };
+    (length) => {
+        opt! { length, i64, Length }
+    };
     // `[&overwrite=<true |false>]`
-    (overwrite) =>  { opt! { overwrite, bool, Overwrite } };
+    (overwrite) => {
+        opt! { overwrite, bool, Overwrite }
+    };
     // `[&blocksize=<LONG>]`
-    (blocksize) => { opt! { blocksize, i64, Blocksize } };
+    (blocksize) => {
+        opt! { blocksize, i64, Blocksize }
+    };
     // `[&replication=<SHORT>]`
-    (replication) => { opt! { replication, i16, Replication } };
+    (replication) => {
+        opt! { replication, i16, Replication }
+    };
     // `[&permission=<OCTAL>]`
-    (permission) => { opt! { permission, u16, Permission } };
+    (permission) => {
+        opt! { permission, u16, Permission }
+    };
     // `[&buffersize=<INT>]`
-    (buffersize) => { opt! { buffersize, i32, BufferSize } };
+    (buffersize) => {
+        opt! { buffersize, i32, BufferSize }
+    };
     // `[&createParent=<true|false>]`
-    (create_parent) => { opt! { create_parent, bool, CreateParent } };
+    (create_parent) => {
+        opt! { create_parent, bool, CreateParent }
+    };
     // `[&recursive=<true|false>]`
-    (recursive) => { opt! { recursive, bool, Recursive } };
+    (recursive) => {
+        opt! { recursive, bool, Recursive }
+    };
 }
 
 macro_rules! op_builder {
     ($tag:ident => $($op:ident),+) => {
         #[derive(Clone)] pub struct $tag { o: Vec<OpArg> }
-        impl $tag { 
+        impl $tag {
             pub fn new() -> Self { Self { o: vec![] } }
             pub(crate) fn into(self) -> Vec<OpArg> { self.o }
             $( opts!{$op} )+

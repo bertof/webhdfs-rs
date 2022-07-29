@@ -1,5 +1,5 @@
+use serde::Deserialize;
 use std::fmt::{Display, Formatter, Result as FmtResult};
-use serde::{Deserialize};
 
 /*
 HTTP/1.1 404 Not Found
@@ -18,31 +18,33 @@ Transfer-Encoding: chunked
 
 #[derive(Debug, Deserialize)]
 pub struct RemoteExceptionResponse {
-    #[serde(rename="RemoteException")]
-    pub remote_exception: RemoteException
+    #[serde(rename = "RemoteException")]
+    pub remote_exception: RemoteException,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct RemoteException {
     pub exception: String,
-    #[serde(rename="javaClassName")]
+    #[serde(rename = "javaClassName")]
     pub java_class_name: String,
-    pub message: String
+    pub message: String,
 }
 
 impl Display for RemoteException {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, 
-            "RemoteException[exception={}, java_class_name={}, msg='{}']", 
+        write!(
+            f,
+            "RemoteException[exception={}, java_class_name={}, msg='{}']",
             self.exception, self.java_class_name, self.message
         )
     }
 }
 
 impl std::error::Error for RemoteException {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> { None }
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
 }
-
 
 /*
 {
@@ -82,24 +84,24 @@ impl std::error::Error for RemoteException {
 
 #[derive(Debug, Deserialize)]
 pub struct ListStatusResponse {
-    #[serde(rename="FileStatuses")]
-    pub file_statuses: FileStatuses
+    #[serde(rename = "FileStatuses")]
+    pub file_statuses: FileStatuses,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct FileStatuses {
-    #[serde(rename="FileStatus")]
-    pub file_status: Vec<FileStatus>
+    #[serde(rename = "FileStatus")]
+    pub file_status: Vec<FileStatus>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct FileStatus {
     //"accessTime"      : 1320171722771,
-    #[serde(rename="accessTime")]
+    #[serde(rename = "accessTime")]
     pub access_time: i64,
 
     //"blockSize"       : 33554432,
-    #[serde(rename="blockSize")]
+    #[serde(rename = "blockSize")]
     pub block_size: i64,
 
     //"group"           : "supergroup",
@@ -109,14 +111,14 @@ pub struct FileStatus {
     pub length: i64,
 
     //"modificationTime": 1320171722771,
-    #[serde(rename="modificationTime")]
+    #[serde(rename = "modificationTime")]
     pub modification_time: i64,
 
     //"owner"           : "webuser",
     pub owner: String,
 
     //"pathSuffix"      : "a.patch",
-    #[serde(rename="pathSuffix")]
+    #[serde(rename = "pathSuffix")]
     pub path_suffix: String,
 
     //"permission"      : "644",
@@ -126,8 +128,8 @@ pub struct FileStatus {
     pub replication: i32,
 
     //"type"            : "FILE"
-    #[serde(rename="type")]
-    pub type_: String
+    #[serde(rename = "type")]
+    pub type_: String,
 }
 
 /*
@@ -164,8 +166,8 @@ pub mod dirent_type {
 
 #[derive(Debug, Deserialize)]
 pub struct FileStatusResponse {
-    #[serde(rename="FileStatus")]
-    pub file_status: FileStatus
+    #[serde(rename = "FileStatus")]
+    pub file_status: FileStatus,
 }
 
 /*
@@ -179,5 +181,5 @@ Transfer-Encoding: chunked
 /// Response to MKDIRS, DELETE, RENAME, TRUNCATE
 #[derive(Debug, Deserialize)]
 pub struct Boolean {
-    pub boolean: bool
+    pub boolean: bool,
 }

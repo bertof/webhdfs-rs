@@ -1,109 +1,158 @@
 //! Synchronous WebHDFS client
-//! 
-//! The main client is `SyncHdfsClient`. It is neither `Send` nor `Sync`, so a separate instance must be created in 
+//!
+//! The main client is `SyncHdfsClient`. It is neither `Send` nor `Sync`, so a separate instance must be created in
 //! each thread accessing the API.
 
-use std::io::{Read, Write, Seek, SeekFrom, Result as IoResult, Error as IoError, ErrorKind as IoErrorKind};
-use std::sync::Arc;
-use std::convert::TryInto;
-use std::time::Duration;
-use std::cell::RefCell;
-use http::Uri;
-use tokio::runtime::{Builder, Runtime};
-use futures::{Future, Stream, stream::StreamExt};
-use bytes::Bytes;
-use crate::error::*;
-use crate::datatypes::*;
 use crate::async_client::*;
-use crate::natmap::NatMap;
+use crate::datatypes::*;
+use crate::error::*;
 use crate::https::HttpsSettings;
+use crate::natmap::NatMap;
+use bytes::Bytes;
+use futures::{stream::StreamExt, Future, Stream};
+use http::Uri;
+use std::cell::RefCell;
+use std::convert::TryInto;
+use std::io::{
+    Error as IoError, ErrorKind as IoErrorKind, Read, Result as IoResult, Seek, SeekFrom, Write,
+};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::runtime::{Builder, Runtime};
 
 pub use crate::op::*;
 
 #[inline]
-fn single_threaded_runtime() -> Result<Runtime> { Ok(Builder::new_current_thread().enable_all().build()?) }
+fn single_threaded_runtime() -> Result<Runtime> {
+    Ok(Builder::new_current_thread().enable_all().build()?)
+}
 
 /// HDFS Connection data, etc.
 #[derive(Clone)]
 pub struct SyncHdfsClient {
-    acx: Arc<HdfsClient>, 
+    acx: Arc<HdfsClient>,
     rt: Arc<RefCell<Runtime>>,
-    fostate: FOState
+    fostate: FOState,
 }
 
 pub struct SyncHdfsClientBuilder {
-    a: HdfsClientBuilder
+    a: HdfsClientBuilder,
 }
 
 impl SyncHdfsClientBuilder {
-    pub fn new(entrypoint: Uri) -> Self { 
-        Self { a: HdfsClientBuilder::new(entrypoint) } 
+    pub fn new(entrypoint: Uri) -> Self {
+        Self {
+            a: HdfsClientBuilder::new(entrypoint),
+        }
     }
-    pub fn from_config() -> Self { 
-        Self { a: HdfsClientBuilder::from_config() } 
+    pub fn from_config() -> Self {
+        Self {
+            a: HdfsClientBuilder::from_config(),
+        }
     }
-    pub fn from_config_opt() -> Option<Self> { 
+    pub fn from_config_opt() -> Option<Self> {
         HdfsClientBuilder::from_config_opt().map(|a| Self { a })
     }
     pub fn alt_entrypoint(self, alt_entrypoint: Uri) -> Self {
-        Self { a: self.a.alt_entrypoint(alt_entrypoint), ..self }
+        Self {
+            a: self.a.alt_entrypoint(alt_entrypoint),
+            ..self
+        }
     }
     pub fn https_settings(self, https_settings: HttpsSettings) -> Self {
-        Self { a: self.a.https_settings(https_settings), ..self }
+        Self {
+            a: self.a.https_settings(https_settings),
+            ..self
+        }
     }
     pub fn natmap(self, natmap: NatMap) -> Self {
-        Self { a: self.a.natmap(natmap), ..self }
+        Self {
+            a: self.a.natmap(natmap),
+            ..self
+        }
     }
     pub fn default_timeout(self, timeout: Duration) -> Self {
-        Self { a: self.a.default_timeout(timeout), ..self }
+        Self {
+            a: self.a.default_timeout(timeout),
+            ..self
+        }
     }
     pub fn user_name(self, user_name: String) -> Self {
-        Self { a: self.a.user_name(user_name), ..self }
+        Self {
+            a: self.a.user_name(user_name),
+            ..self
+        }
     }
     pub fn doas(self, doas: String) -> Self {
-        Self { a: self.a.doas(doas), ..self }
+        Self {
+            a: self.a.doas(doas),
+            ..self
+        }
     }
     pub fn delegation_token(self, dt: String) -> Self {
-        Self { a: self.a.delegation_token(dt), ..self }
-    }    
+        Self {
+            a: self.a.delegation_token(dt),
+            ..self
+        }
+    }
     pub fn build(self) -> Result<SyncHdfsClient> {
-         Ok(SyncHdfsClient { 
-            acx: Arc::new(self.a.build()), 
+        Ok(SyncHdfsClient {
+            acx: Arc::new(self.a.build()),
             rt: Arc::new(RefCell::new(single_threaded_runtime()?)),
-            fostate: FOState::PRIMARY
+            fostate: FOState::PRIMARY,
         })
     }
 }
 
 impl SyncHdfsClient {
-    pub fn from_async(acx: HdfsClient)-> Result<Self> {
-        Ok(Self { 
-            acx: Arc::new(acx), 
+    pub fn from_async(acx: HdfsClient) -> Result<Self> {
+        Ok(Self {
+            acx: Arc::new(acx),
             rt: Arc::new(RefCell::new(single_threaded_runtime()?)),
-            fostate: FOState::PRIMARY
+            fostate: FOState::PRIMARY,
         })
     }
 
-    pub fn fostate(&self) -> FOState { self.fostate }
-
-    pub fn with_fostate(self, fostate: FOState) -> Self { Self { fostate, ..self } }
-    
-    #[inline]
-    fn exec<R, E>(&self, f: impl Future<Output=FOStdResult<R, E>>) -> FOStdResult<R, E> where E: From<tokio::time::error::Elapsed>{
-        async fn with_timeout<R, E>(f: impl Future<Output=FOStdResult<R, E>>, fostate: FOState, timeout: Duration) 
-        -> FOStdResult<R, E> 
-        where E: From<tokio::time::error::Elapsed> {
-            Ok(tokio::time::timeout(timeout, f).await.map_err(|e| (e.into(), fostate))??)
-        }
-        self.rt.borrow_mut().block_on(with_timeout(f, self.fostate, self.acx.default_timeout().clone()))
+    pub fn fostate(&self) -> FOState {
+        self.fostate
     }
-    
+
+    pub fn with_fostate(self, fostate: FOState) -> Self {
+        Self { fostate, ..self }
+    }
+
     #[inline]
-    fn exec0<R>(&self, f: impl Future<Output=R>) -> Result<R> {
-        async fn with_timeout<R>(f: impl Future<Output=R>, timeout: Duration) -> Result<R> {
+    fn exec<R, E>(&self, f: impl Future<Output = FOStdResult<R, E>>) -> FOStdResult<R, E>
+    where
+        E: From<tokio::time::error::Elapsed>,
+    {
+        async fn with_timeout<R, E>(
+            f: impl Future<Output = FOStdResult<R, E>>,
+            fostate: FOState,
+            timeout: Duration,
+        ) -> FOStdResult<R, E>
+        where
+            E: From<tokio::time::error::Elapsed>,
+        {
+            Ok(tokio::time::timeout(timeout, f)
+                .await
+                .map_err(|e| (e.into(), fostate))??)
+        }
+        self.rt.borrow_mut().block_on(with_timeout(
+            f,
+            self.fostate,
+            self.acx.default_timeout().clone(),
+        ))
+    }
+
+    #[inline]
+    fn exec0<R>(&self, f: impl Future<Output = R>) -> Result<R> {
+        async fn with_timeout<R>(f: impl Future<Output = R>, timeout: Duration) -> Result<R> {
             Ok(tokio::time::timeout(timeout, f).await?)
         }
-        self.rt.borrow_mut().block_on(with_timeout(f, self.acx.default_timeout().clone()))
+        self.rt
+            .borrow_mut()
+            .block_on(with_timeout(f, self.acx.default_timeout().clone()))
     }
 
     #[inline]
@@ -114,7 +163,11 @@ impl SyncHdfsClient {
     }
 
     /// Open a file for reading
-    pub fn open(&mut self, path: &str, open_options: OpenOptions) -> Result<Box<dyn Stream<Item=Result<Bytes>>+Unpin>> {
+    pub fn open(
+        &mut self,
+        path: &str,
+        open_options: OpenOptions,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes>> + Unpin>> {
         let fs = self.acx.open(self.fostate, path, open_options);
         let r = self.exec0(fs)?;
         self.foresult(r)
@@ -134,7 +187,11 @@ impl SyncHdfsClient {
         self.foresult(r)
     }
 
-    fn save_stream<W: Write>(&self, input: impl Stream<Item=Result<Bytes>>, output: &mut W) -> Result<()> {
+    fn save_stream<W: Write>(
+        &self,
+        input: impl Stream<Item = Result<Bytes>>,
+        output: &mut W,
+    ) -> Result<()> {
         fn write_bytes<W: Write>(b: &Bytes, w: &mut W) -> Result<()> {
             if w.write(&b)? != b.len() {
                 Err(app_error!(generic "Short write"))
@@ -149,7 +206,7 @@ impl SyncHdfsClient {
             match ob {
                 Some(Ok(bytes)) => write_bytes(&bytes, output)?,
                 Some(Err(e)) => break Err(e),
-                None => break Ok(())
+                None => break Ok(()),
             }
             input = input2;
         }
@@ -157,7 +214,7 @@ impl SyncHdfsClient {
 
     /// Get a file (read it from hdfs and save to local fs)
     #[inline]
-    pub fn get_file<W: Write>(&mut self, input: &str, output: &mut W) -> Result<()> {    
+    pub fn get_file<W: Write>(&mut self, input: &str, output: &mut W) -> Result<()> {
         let s = self.open(input, OpenOptions::new())?;
         self.save_stream(s, output)
     }
@@ -198,8 +255,15 @@ impl SyncHdfsClient {
     }
 
     /// Create a Symbolic Link
-    pub fn create_symlink(&mut self, path: &str, destination: String, opts: CreateSymlinkOptions) ->  Result<()> {
-        let r = self.acx.create_symlink(self.fostate, path, destination, opts);
+    pub fn create_symlink(
+        &mut self,
+        path: &str,
+        destination: String,
+        opts: CreateSymlinkOptions,
+    ) -> Result<()> {
+        let r = self
+            .acx
+            .create_symlink(self.fostate, path, destination, opts);
         let r = self.exec(r);
         self.foresult(r)
     }
@@ -212,16 +276,15 @@ impl SyncHdfsClient {
     }
 }
 
-
 /// HDFS file read object.
-/// 
-/// Note about position and offset types: we assume that all hdfs/webhdfs lengths and offsets are actually signed 64-bit integers, 
+///
+/// Note about position and offset types: we assume that all hdfs/webhdfs lengths and offsets are actually signed 64-bit integers,
 /// according to protocol specifications and JVM specifics (no unsigned).
 pub struct ReadHdfsFile {
     cx: SyncHdfsClient,
     path: String,
     len: i64,
-    pos: i64
+    pos: i64,
 }
 
 impl ReadHdfsFile {
@@ -234,23 +297,32 @@ impl ReadHdfsFile {
         Self { cx, path, len, pos }
     }
     /// File length in bytes
-    pub fn len(&self) -> u64 { self.len as u64 }
+    pub fn len(&self) -> u64 {
+        self.len as u64
+    }
 
     /// Splits self into `(sync_client, path, (pos, len))`
-    pub fn into_parts(self) -> (SyncHdfsClient, String, (i64, i64)) { (self.cx, self.path, (self.pos, self.len)) }
+    pub fn into_parts(self) -> (SyncHdfsClient, String, (i64, i64)) {
+        (self.cx, self.path, (self.pos, self.len))
+    }
 }
 
 impl Read for ReadHdfsFile {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
-        
         if self.pos == self.len {
             return Ok(0);
         }
 
-        let buf_len: i64 = buf.len().try_into().map_err(|_| IoError::new(IoErrorKind::InvalidInput, "buffer too big"))?;
-        let s = self.cx.open(&self.path, OpenOptions::new().offset(self.pos).length(buf_len))?;
+        let buf_len: i64 = buf
+            .len()
+            .try_into()
+            .map_err(|_| IoError::new(IoErrorKind::InvalidInput, "buffer too big"))?;
+        let s = self.cx.open(
+            &self.path,
+            OpenOptions::new().offset(self.pos).length(buf_len),
+        )?;
         let mut pos: usize = 0;
-        
+
         let mut s = Box::pin(s);
         loop {
             let f = s.into_future();
@@ -261,12 +333,8 @@ impl Read for ReadHdfsFile {
                     let bcount = (&mut buf[pos..]).write(&chunk)?;
                     pos += bcount;
                 }
-                (Some(Err(e)), _) => {
-                    break Err(e.into())
-                }
-                (None, _) => {
-                    break Ok(pos)
-                }
+                (Some(Err(e)), _) => break Err(e.into()),
+                (None, _) => break Ok(pos),
             }
         }
     }
@@ -279,9 +347,12 @@ impl Seek for ReadHdfsFile {
 
         fn offset(pos: i64, offset: i64, len: i64) -> IoResult<i64> {
             match pos.checked_add(offset) {
-                Some(p) if p < 0 => Err(IoError::new(IoErrorKind::InvalidInput, "attempt to seek before start")),
+                Some(p) if p < 0 => Err(IoError::new(
+                    IoErrorKind::InvalidInput,
+                    "attempt to seek before start",
+                )),
                 Some(p) if p <= len => Ok(p),
-                _ => Ok(pos)
+                _ => Ok(pos),
             }
         }
 
@@ -289,44 +360,68 @@ impl Seek for ReadHdfsFile {
             SeekFrom::Current(0) => Ok(self.pos),
             SeekFrom::Current(o) => offset(self.pos, o, self.len),
             SeekFrom::Start(0) => Ok(0),
-            SeekFrom::Start(o) => offset(0, o.try_into().map_err(|_| IoError::new(IoErrorKind::InvalidInput, "offset too big"))?, self.len),
+            SeekFrom::Start(o) => offset(
+                0,
+                o.try_into()
+                    .map_err(|_| IoError::new(IoErrorKind::InvalidInput, "offset too big"))?,
+                self.len,
+            ),
             SeekFrom::End(0) => Ok(self.len),
-            SeekFrom::End(o) => offset(self.len, o, self.len),                
+            SeekFrom::End(o) => offset(self.len, o, self.len),
         }?;
         Ok(self.pos as u64)
     }
 }
 
-
 /// HDFS file write object
 pub struct WriteHdfsFile {
     cx: SyncHdfsClient,
     path: String,
-    opts: AppendOptions
+    opts: AppendOptions,
 }
 
 impl WriteHdfsFile {
-    pub fn create(mut cx: SyncHdfsClient, path: String, c_opts: CreateOptions, a_opts: AppendOptions) -> Result<WriteHdfsFile> {
-        cx.create(&path, crate::rest_client::data_empty(), c_opts).map_err(ErrorD::drop)?;
-        Ok(Self { cx, path, opts: a_opts })
+    pub fn create(
+        mut cx: SyncHdfsClient,
+        path: String,
+        c_opts: CreateOptions,
+        a_opts: AppendOptions,
+    ) -> Result<WriteHdfsFile> {
+        cx.create(&path, crate::rest_client::data_empty(), c_opts)
+            .map_err(ErrorD::drop)?;
+        Ok(Self {
+            cx,
+            path,
+            opts: a_opts,
+        })
     }
     pub fn append(cx: SyncHdfsClient, path: String, opts: AppendOptions) -> Result<WriteHdfsFile> {
         Ok(Self { cx, path, opts })
     }
     /// Splits self into `(sync_client, path, (pos, len))`
-    pub fn into_parts(self) -> (SyncHdfsClient, String) { (self.cx, self.path) }
+    pub fn into_parts(self) -> (SyncHdfsClient, String) {
+        (self.cx, self.path)
+    }
 
     ///zero-copy write (work around tokio's lack of support for scoped threading)
     #[cfg(feature = "zero-copy-on-write")]
     fn do_write(&mut self, buf: &[u8]) -> DResult<()> {
-        let b: & 'static [u8] = unsafe { std::mem::transmute(buf) };
-        self.cx.append(&self.path, crate::rest_client::data_borrowed(b), self.opts.clone())
+        let b: &'static [u8] = unsafe { std::mem::transmute(buf) };
+        self.cx.append(
+            &self.path,
+            crate::rest_client::data_borrowed(b),
+            self.opts.clone(),
+        )
     }
 
     #[cfg(not(feature = "zero-copy-on-write"))]
     fn do_write(&mut self, buf: &[u8]) -> DResult<()> {
         let b = buf.to_owned();
-        self.cx.append(&self.path, crate::rest_client::data_owned(b), self.opts.clone())
+        self.cx.append(
+            &self.path,
+            crate::rest_client::data_owned(b),
+            self.opts.clone(),
+        )
     }
 }
 
