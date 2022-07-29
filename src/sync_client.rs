@@ -4,10 +4,10 @@
 //! each thread accessing the API.
 
 use std::io::{Read, Write, Seek, SeekFrom, Result as IoResult, Error as IoError, ErrorKind as IoErrorKind};
+use std::sync::Arc;
 use std::convert::TryInto;
 use std::time::Duration;
 use std::cell::RefCell;
-use std::rc::Rc;
 use http::Uri;
 use tokio::runtime::{Builder, Runtime};
 use futures::{Future, Stream, stream::StreamExt};
@@ -26,8 +26,8 @@ fn single_threaded_runtime() -> Result<Runtime> { Ok(Builder::new_current_thread
 /// HDFS Connection data, etc.
 #[derive(Clone)]
 pub struct SyncHdfsClient {
-    acx: Rc<HdfsClient>, 
-    rt: Rc<RefCell<Runtime>>,
+    acx: Arc<HdfsClient>, 
+    rt: Arc<RefCell<Runtime>>,
     fostate: FOState
 }
 
@@ -68,8 +68,8 @@ impl SyncHdfsClientBuilder {
     }    
     pub fn build(self) -> Result<SyncHdfsClient> {
          Ok(SyncHdfsClient { 
-            acx: Rc::new(self.a.build()), 
-            rt: Rc::new(RefCell::new(single_threaded_runtime()?)),
+            acx: Arc::new(self.a.build()), 
+            rt: Arc::new(RefCell::new(single_threaded_runtime()?)),
             fostate: FOState::PRIMARY
         })
     }
@@ -78,8 +78,8 @@ impl SyncHdfsClientBuilder {
 impl SyncHdfsClient {
     pub fn from_async(acx: HdfsClient)-> Result<Self> {
         Ok(Self { 
-            acx: Rc::new(acx), 
-            rt: Rc::new(RefCell::new(single_threaded_runtime()?)),
+            acx: Arc::new(acx), 
+            rt: Arc::new(RefCell::new(single_threaded_runtime()?)),
             fostate: FOState::PRIMARY
         })
     }
