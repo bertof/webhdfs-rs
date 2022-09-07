@@ -15,6 +15,7 @@ use log::{debug, trace};
 use mime::Mime;
 
 /// Required response content-type
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, PartialEq, Copy, Clone)]
 enum RCT {
     /// Response must not have content-type (i.e., must be empty)
@@ -50,7 +51,7 @@ async fn error_and_ct_filter(ct_required: RCT, res: Response<Body>) -> Result<Re
         let m = res
             .headers()
             .get(hyper::header::CONTENT_TYPE)
-            .map(|s| s.to_str().map(|x| mime::Mime::from_str(x)));
+            .map(|s| s.to_str().map(mime::Mime::from_str));
         match m {
             Some(Ok(Ok(ct))) => Ok(Some(ct)),
             Some(Ok(Err(ect))) => Err(ect.into()),
@@ -62,11 +63,11 @@ async fn error_and_ct_filter(ct_required: RCT, res: Response<Body>) -> Result<Re
     #[inline]
     fn match_mimes(ct: &Option<Mime>, ct_required: RCT) -> bool {
         match (ct, ct_required) {
-            (Some(ct), RCT::JSON) => match (ct.type_(), ct.subtype(), ct.get_param("charset")) {
-                (mime::APPLICATION, mime::JSON, Some(mime::UTF_8)) => true,
-                (mime::APPLICATION, mime::JSON, None) => true,
-                _ => false,
-            },
+            (Some(ct), RCT::JSON) => matches!(
+                (ct.type_(), ct.subtype(), ct.get_param("charset")),
+                (mime::APPLICATION, mime::JSON, Some(mime::UTF_8))
+                    | (mime::APPLICATION, mime::JSON, None)
+            ),
             (Some(ct), RCT::Binary) => mime::APPLICATION_OCTET_STREAM.eq(ct),
             (None, RCT::None) => true,
             _ => false,
@@ -93,7 +94,7 @@ async fn error_and_ct_filter(ct_required: RCT, res: Response<Body>) -> Result<Re
                     Ok(rer) => Err(rer.remote_exception.into()),
                     Err(e) => Err(
                         app_error!(generic "JSON-error deseriaization error: {}, recovered text: '{}'",
-                            e, String::from_utf8_lossy(buf.chunk().as_ref())
+                            e, String::from_utf8_lossy(buf.chunk())
                         ),
                     ),
                 },

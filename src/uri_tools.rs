@@ -59,7 +59,7 @@ where
             }
             UriEncodingIteratorState::Null => match self.i.next() {
                 //encode if b is not unreserved, and if (b is slash and we omit slashes) is wrong
-                Some(b) if !Self::is_unreserved(b) && !(b == b'/' && self.omit_slash) => {
+                Some(b) if !(Self::is_unreserved(b) || b == b'/' && self.omit_slash) => {
                     self.s = UriEncodingIteratorState::C2(
                         Self::hex_from_digit((b >> 4) & 0x0f),
                         Self::hex_from_digit(b & 0x0f),
@@ -201,7 +201,7 @@ impl QueryEncoder {
         self.path_and_query.extend(uri_part_encoder_iter(p, false));
         self.path_and_query.push(b'=');
         self.path_and_query
-            .extend(format!("{}", if v { "true" } else { "false" }).bytes());
+            .extend(if v { "true" } else { "false" }.bytes());
         self
     }
     /// add octal (hdfs permissions)

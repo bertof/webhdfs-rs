@@ -56,43 +56,36 @@ impl SyncHdfsClientBuilder {
     pub fn alt_entrypoint(self, alt_entrypoint: Uri) -> Self {
         Self {
             a: self.a.alt_entrypoint(alt_entrypoint),
-            ..self
         }
     }
     pub fn https_settings(self, https_settings: HttpsSettings) -> Self {
         Self {
             a: self.a.https_settings(https_settings),
-            ..self
         }
     }
     pub fn natmap(self, natmap: NatMap) -> Self {
         Self {
             a: self.a.natmap(natmap),
-            ..self
         }
     }
     pub fn default_timeout(self, timeout: Duration) -> Self {
         Self {
             a: self.a.default_timeout(timeout),
-            ..self
         }
     }
     pub fn user_name(self, user_name: String) -> Self {
         Self {
             a: self.a.user_name(user_name),
-            ..self
         }
     }
     pub fn doas(self, doas: String) -> Self {
         Self {
             a: self.a.doas(doas),
-            ..self
         }
     }
     pub fn delegation_token(self, dt: String) -> Self {
         Self {
             a: self.a.delegation_token(dt),
-            ..self
         }
     }
     pub fn build(self) -> Result<SyncHdfsClient> {
@@ -134,15 +127,13 @@ impl SyncHdfsClient {
         where
             E: From<tokio::time::error::Elapsed>,
         {
-            Ok(tokio::time::timeout(timeout, f)
+            tokio::time::timeout(timeout, f)
                 .await
-                .map_err(|e| (e.into(), fostate))??)
+                .map_err(|e| (e.into(), fostate))?
         }
-        self.rt.borrow_mut().block_on(with_timeout(
-            f,
-            self.fostate,
-            self.acx.default_timeout().clone(),
-        ))
+        self.rt
+            .borrow_mut()
+            .block_on(with_timeout(f, self.fostate, *self.acx.default_timeout()))
     }
 
     #[inline]
@@ -152,7 +143,7 @@ impl SyncHdfsClient {
         }
         self.rt
             .borrow_mut()
-            .block_on(with_timeout(f, self.acx.default_timeout().clone()))
+            .block_on(with_timeout(f, *self.acx.default_timeout()))
     }
 
     #[inline]
@@ -193,7 +184,7 @@ impl SyncHdfsClient {
         output: &mut W,
     ) -> Result<()> {
         fn write_bytes<W: Write>(b: &Bytes, w: &mut W) -> Result<()> {
-            if w.write(&b)? != b.len() {
+            if w.write(b)? != b.len() {
                 Err(app_error!(generic "Short write"))
             } else {
                 Ok(())
@@ -290,7 +281,7 @@ pub struct ReadHdfsFile {
 impl ReadHdfsFile {
     /// Opens the file specified by `path` for reading
     pub fn open(mut cx: SyncHdfsClient, path: String) -> Result<ReadHdfsFile> {
-        let stat = cx.stat(&&path)?;
+        let stat = cx.stat(&path)?;
         Ok(Self::new(cx, path, stat.file_status.length, 0))
     }
     fn new(cx: SyncHdfsClient, path: String, len: i64, pos: i64) -> Self {
@@ -299,6 +290,10 @@ impl ReadHdfsFile {
     /// File length in bytes
     pub fn len(&self) -> u64 {
         self.len as u64
+    }
+    /// Check if file is empty
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Splits self into `(sync_client, path, (pos, len))`
@@ -427,7 +422,7 @@ impl WriteHdfsFile {
 
 impl Write for WriteHdfsFile {
     fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
-        let () = self.do_write(buf).map_err(ErrorD::drop)?;
+        self.do_write(buf).map_err(ErrorD::drop)?;
         Ok(buf.len())
     }
     fn flush(&mut self) -> IoResult<()> {

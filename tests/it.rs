@@ -150,9 +150,9 @@ size={z}",
     }
 
     fn parse_size(s: &str) -> i64 {
-        if s.ends_with("k") {
+        if s.ends_with('k') {
             &s[0..s.len() - 1].parse::<i64>().unwrap() * 1024
-        } else if s.ends_with("m") {
+        } else if s.ends_with('m') {
             &s[0..s.len() - 1].parse::<i64>().unwrap() * 1024 * 1024
         } else {
             s.parse().unwrap()
@@ -183,8 +183,7 @@ size={z}",
         .try_into()
         .unwrap();
     print!("alloc_mb(len={})...", master_buffer_size);
-    let mut b = Vec::with_capacity(master_buffer_size);
-    b.resize(master_buffer_size, 0);
+    let mut b = vec![0; master_buffer_size];
     println!("done");
 
     let mut file = ReadHdfsFile::open(cx, source.clone()).unwrap();
@@ -215,13 +214,8 @@ size={z}",
         .split(' ')
         .filter(|e| !e.is_empty())
         .collect::<Vec<&str>>();
-    let mut file = WriteHdfsFile::create(
-        cx,
-        target.clone(),
-        CreateOptions::new(),
-        AppendOptions::new(),
-    )
-    .unwrap();
+    let mut file =
+        WriteHdfsFile::create(cx, target, CreateOptions::new(), AppendOptions::new()).unwrap();
     let mut count = 0usize;
 
     for file_name in files {
@@ -295,9 +289,8 @@ size={z}",
         //get binary
         let cx = cx.with_fostate(standby_state);
         let mut file = ReadHdfsFile::open(cx, source.clone()).unwrap();
-        let mut b = Vec::with_capacity(1024);
-        b.resize(b.capacity(), 0);
-        file.read(&mut b).unwrap();
+        let mut b = vec![0; b.capacity()];
+        file.read_exact(&mut b).unwrap();
     } else {
         println!("No alt_entrypoint specified -- skip failover test");
     }

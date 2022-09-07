@@ -57,7 +57,7 @@ impl Serialize for UriW {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct HttpsConfig {
     pub danger_accept_invalid_certs: Option<bool>,
     pub danger_accept_invalid_hostnames: Option<bool>,
@@ -71,16 +71,7 @@ pub struct HttpsConfig {
 
 impl HttpsConfig {
     pub fn new() -> Self {
-        Self {
-            danger_accept_invalid_certs: None,
-            danger_accept_invalid_hostnames: None,
-            use_sni: None,
-            identity_file: None,
-            identity_password: None,
-            min_protocol_version: None,
-            max_protocol_version: None,
-            root_certificates: None,
-        }
+        Self::default()
     }
 }
 
@@ -177,8 +168,8 @@ pub fn read_config() -> Config {
 pub fn read_config_opt() -> Option<Config> {
     read_env_config()
         .expect("Configuration error (file specified by WEBHDFS_CONFIG environment var)")
-        .or(read_local_config().expect("Configuration error (webhdfs.toml in CWD)"))
-        .or(read_user_config().expect("Configuration error (.webhdfs.toml in homedir)"))
+        .or_else(|| read_local_config().expect("Configuration error (webhdfs.toml in CWD)"))
+        .or_else(|| read_user_config().expect("Configuration error (.webhdfs.toml in homedir)"))
 }
 
 pub fn write_config(path: &Path, c: &Config, new_file: bool) {
@@ -211,7 +202,7 @@ pub fn write_sample_config() {
 /// ```
 #[inline]
 pub fn split_kv(l: String) -> Result<(String, String)> {
-    let mut fs = l.splitn(2, "=");
+    let mut fs = l.splitn(2, '=');
     let a = fs
         .next()
         .ok_or_else(|| app_error!(generic "cannot read entry key: {}", l))?

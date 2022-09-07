@@ -23,19 +23,17 @@ impl NatMap {
     pub fn translate(&self, uri: Uri) -> Result<Uri> {
         if self.natmap.is_empty() {
             Ok(uri)
-        } else {
-            if let Some(s) = uri.authority() {
-                if let Some(replacement) = self.natmap.get(s.as_str()) {
-                    let mut parts = uri.into_parts();
-                    parts.authority = Some(replacement.clone());
-                    Ok(http::uri::Uri::from_parts(parts)
-                        .aerr("Could not assemble redirect uri after NAT")?)
-                } else {
-                    Ok(uri)
-                }
+        } else if let Some(s) = uri.authority() {
+            if let Some(replacement) = self.natmap.get(s.as_str()) {
+                let mut parts = uri.into_parts();
+                parts.authority = Some(replacement.clone());
+                Ok(http::uri::Uri::from_parts(parts)
+                    .aerr("Could not assemble redirect uri after NAT")?)
             } else {
                 Ok(uri)
             }
+        } else {
+            Ok(uri)
         }
     }
 }

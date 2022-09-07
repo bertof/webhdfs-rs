@@ -8,18 +8,18 @@ fn main() {
     let (mut client, op) = parse_command_line();
 
     match op {
-        Operation::Get(mut fs) => match &fs[..] {
-            &[ref input] => {
+        Operation::Get(mut fs) => match fs[..] {
+            [ref input] => {
                 let input_path = Path::new(input);
                 let output = input_path
                     .file_name()
                     .expect2("file name must be specified if no output file is given");
                 let mut out = File::create(&output).expect2("Could not create output file");
-                client.get_file(&input, &mut out).expect2("get error")
+                client.get_file(input, &mut out).expect2("get error")
             }
-            &[ref input, ref output] => {
+            [ref input, ref output] => {
                 let mut out = File::create(&output).expect2("Could not create output file");
-                client.get_file(&input, &mut out).expect2("get error")
+                client.get_file(input, &mut out).expect2("get error")
             }
             _ => {
                 let target_dir_ = fs.pop().unwrap();
@@ -239,7 +239,7 @@ fn parse_command_line() -> (SyncHdfsClient, Operation) {
         }
         let uri = result.uri.expect2("must specify --uri when saving config");
         let cfg = config::Config::new(uri.parse().expect2("Cannot parse URI"));
-        config::write_config(&std::path::Path::new(&f), &cfg, true);
+        config::write_config(std::path::Path::new(&f), &cfg, true);
         std::process::exit(0);
     } else {
         let operation = if let Some(op) = result.op {
@@ -273,7 +273,7 @@ fn parse_command_line() -> (SyncHdfsClient, Operation) {
 
         let operation = match operation {
             Op::Get => {
-                if result.files.len() > 0 {
+                if !result.files.is_empty() {
                     Operation::Get(result.files)
                 } else {
                     error_exit("must specify at least one input file for --get", "")
@@ -356,7 +356,7 @@ mod commandline {
                 *bypass = true;
                 vec![]
             } else if v.starts_with("--") {
-                let mut s: Vec<String> = v.splitn(2, "=").map(|r| r.to_string()).collect();
+                let mut s: Vec<String> = v.splitn(2, '=').map(|r| r.to_string()).collect();
                 let a = s.pop();
                 let b = s.pop();
                 match (a, b) {
@@ -364,7 +364,7 @@ mod commandline {
                     (Some(b), Some(a)) => vec![CmdLn::Switch(a), CmdLn::Arg(b)],
                     _ => unreachable!(),
                 }
-            } else if v.starts_with("-") && v != "-" {
+            } else if v.starts_with('-') && v != "-" {
                 v.chars()
                     .skip(1)
                     .map(|c| CmdLn::Item(String::from_iter(vec!['-', c])))

@@ -1,3 +1,5 @@
+#![deny(clippy::all)]
+
 //! Hadoop WebHDFS API for Rust
 //!
 //! Quick start:

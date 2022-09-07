@@ -2,32 +2,32 @@ use crate::uri_tools::QueryEncoder;
 
 #[derive(Debug, Clone)]
 pub(crate) enum Op {
-    LISTSTATUS,
-    GETFILESTATUS,
-    OPEN,
-    CREATE,
-    APPEND,
-    CONCAT,
-    MKDIRS,
-    RENAME,
-    CREATESYMLINK,
-    DELETE,
+    ListStatus,
+    GetFileStatus,
+    Open,
+    Create,
+    Append,
+    Concat,
+    MkDirs,
+    Rename,
+    CreateSymlink,
+    Delete,
 }
 
 impl Op {
     pub(crate) fn op_string(&self) -> &'static str {
         use self::Op::*;
         match self {
-            LISTSTATUS => "LISTSTATUS",
-            GETFILESTATUS => "GETFILESTATUS",
-            OPEN => "OPEN",
-            CREATE => "CREATE",
-            APPEND => "APPEND",
-            CONCAT => "CONCAT",
-            MKDIRS => "MKDIRS",
-            RENAME => "RENAME",
-            CREATESYMLINK => "CREATESYMLINK",
-            DELETE => "DELETE",
+            ListStatus => "LISTSTATUS",
+            GetFileStatus => "GETFILESTATUS",
+            Open => "OPEN",
+            Create => "CREATE",
+            Append => "APPEND",
+            Concat => "CONCAT",
+            MkDirs => "MKDIRS",
+            Rename => "RENAME",
+            CreateSymlink => "CREATESYMLINK",
+            Delete => "DELETE",
         }
     }
 }
@@ -130,9 +130,9 @@ macro_rules! opts {
 
 macro_rules! op_builder {
     ($tag:ident => $($op:ident),+) => {
-        #[derive(Clone)] pub struct $tag { o: Vec<OpArg> }
+        #[derive(Clone, Default)] pub struct $tag { o: Vec<OpArg> }
         impl $tag {
-            pub fn new() -> Self { Self { o: vec![] } }
+            pub fn new() -> Self { Self::default() }
             pub(crate) fn into(self) -> Vec<OpArg> { self.o }
             $( opts!{$op} )+
         }

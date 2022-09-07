@@ -55,12 +55,12 @@ impl HdfsClientBuilder {
             .map(|natmap| {
                 NatMapPtr::new(NatMap::new(natmap.into_iter()).expect("cannot build natmap"))
             })
-            .unwrap_or_else(|| NatMapPtr::empty());
+            .unwrap_or_else(NatMapPtr::empty);
         Self {
             c: HdfsClient {
                 entrypoint: conf.entrypoint.into_uri().into_parts(),
                 alt_entrypoint: conf.alt_entrypoint.map(|u| u.into_uri().into_parts()),
-                natmap: natmap,
+                natmap,
                 default_timeout: conf
                     .default_timeout
                     .unwrap_or_else(|| Duration::from_secs(Self::DEFAULT_TIMEOUT_S)),
@@ -161,11 +161,7 @@ pub enum FOState {
 impl FOState {
     #[inline]
     pub fn is_alt(&self) -> bool {
-        if let Self::ALT = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::ALT)
     }
     pub fn next(self) -> Self {
         if let Self::ALT = self {
@@ -317,14 +313,7 @@ impl HdfsClient {
         //    exception: "StandbyException",
         //    java_class_name: "org.apache.hadoop.ipc.StandbyException",
         //    message: "Operation category WRITE is not supported in state standby. Visit https://s.apache.org/sbnn-error" }) }',
-        match error.cause() {
-            Cause::RemoteException(RemoteException { exception, .. })
-                if exception == "StandbyException" =>
-            {
-                true
-            }
-            _ => false,
-        }
+        matches!(error.cause(), Cause::RemoteException(RemoteException { exception, .. }) if exception == "StandbyException")
     }
 
     fn failover_fsm<T>(&self, fostate: FOState, result: Result<T>) -> (FOAction<T, ()>, FOState) {
@@ -484,12 +473,12 @@ impl HdfsClient {
 
     /// Get directory listing
     pub async fn dir(&self, fostate: FOState, path: &str) -> FOResult<ListStatusResponse> {
-        self.get_json(fostate, path, Op::LISTSTATUS, vec![]).await
+        self.get_json(fostate, path, Op::ListStatus, vec![]).await
     }
 
     /// Get status
     pub async fn stat(&self, fostate: FOState, path: &str) -> FOResult<FileStatusResponse> {
-        self.get_json(fostate, path, Op::GETFILESTATUS, vec![])
+        self.get_json(fostate, path, Op::GetFileStatus, vec![])
             .await
     }
 
@@ -507,7 +496,7 @@ impl HdfsClient {
             ],
             self,
             fostate,
-            self.path_and_query(path, Op::OPEN, opts.into())
+            self.path_and_query(path, Op::Open, opts.into())
         )
     }
 
@@ -522,7 +511,7 @@ impl HdfsClient {
         //curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=CREATE
         //           [&overwrite=<true |false>][&blocksize=<LONG>][&replication=<SHORT>]
         //           [&permission=<OCTAL>][&buffersize=<INT>]"
-        self.data_op(fostate, Method::PUT, path, Op::CREATE, opts.into(), data)
+        self.data_op(fostate, Method::PUT, path, Op::Create, opts.into(), data)
             .await
     }
 
@@ -535,7 +524,7 @@ impl HdfsClient {
         opts: AppendOptions,
     ) -> FODResult<()> {
         //curl -i -X POST "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=APPEND[&buffersize=<INT>]"
-        self.data_op(fostate, Method::POST, path, Op::APPEND, opts.into(), data)
+        self.data_op(fostate, Method::POST, path, Op::Append, opts.into(), data)
             .await
     }
 
@@ -546,7 +535,7 @@ impl HdfsClient {
             fostate,
             Method::POST,
             path,
-            Op::CONCAT,
+            Op::Concat,
             vec![OpArg::Sources(paths)],
         )
         .await
@@ -560,7 +549,7 @@ impl HdfsClient {
         opts: MkdirsOptions,
     ) -> FOResult<bool> {
         //curl -i -X PUT "http://<HOST>:<PORT>/webhdfs/v1/<PATH>?op=MKDIRS[&permission=<OCTAL>]"
-        self.data_op_b(fostate, Method::PUT, path, Op::MKDIRS, opts.into())
+        self.data_op_b(fostate, Method::PUT, path, Op::MkDirs, opts.into())
             .await
     }
 
@@ -576,7 +565,7 @@ impl HdfsClient {
             fostate,
             Method::PUT,
             path,
-            Op::RENAME,
+            Op::Rename,
             vec![OpArg::Destination(destination)],
         )
         .await
@@ -594,7 +583,7 @@ impl HdfsClient {
         //                      &destination=<PATH>[&createParent=<true|false>]"
         let mut o = vec![OpArg::Destination(destination)];
         o.append(&mut opts.into());
-        self.data_op_e(fostate, Method::PUT, path, Op::CREATESYMLINK, o)
+        self.data_op_e(fostate, Method::PUT, path, Op::CreateSymlink, o)
             .await
     }
 
@@ -607,7 +596,7 @@ impl HdfsClient {
     ) -> FOResult<bool> {
         //curl -i -X DELETE "http://<host>:<port>/webhdfs/v1/<path>?op=DELETE
         //                      [&recursive=<true|false>]"
-        self.data_op_b(fostate, Method::DELETE, path, Op::DELETE, opts.into())
+        self.data_op_b(fostate, Method::DELETE, path, Op::Delete, opts.into())
             .await
     }
 }

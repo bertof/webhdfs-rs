@@ -52,7 +52,7 @@ pub fn read_cert_file(file_path: &str) -> Result<Certificate> {
 /// fallible version of convert_https_settings
 fn https_settings_from_config_f(config: HttpsConfig) -> Result<HttpsSettings> {
     let identity_password: &str = if let Some(s) = &config.identity_password {
-        &s
+        s
     } else {
         ""
     };

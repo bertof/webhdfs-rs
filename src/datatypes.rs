@@ -157,11 +157,11 @@ Transfer-Encoding: chunked
 /// Directory entry types (as returmed by stat and dir)
 pub mod dirent_type {
     /// Value of `FileStatus.type` corresponding to a regular file (`"FILE"`)
-    pub const FILE: &'static str = "FILE";
+    pub const FILE: &str = "FILE";
     /// Value of `FileStatus.type` corresponding to a directory (`"DIRECTORY"`)
-    pub const DIRECTORY: &'static str = "DIRECTORY";
+    pub const DIRECTORY: &str = "DIRECTORY";
     /// Value of `FileStatus.type` corresponding to a symbolic link (`"SYMLINK"`)
-    pub const SYMLINK: &'static str = "SYMLINK";
+    pub const SYMLINK: &str = "SYMLINK";
 }
 
 #[derive(Debug, Deserialize)]

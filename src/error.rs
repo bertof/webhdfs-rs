@@ -53,7 +53,7 @@ impl Error {
     }
     pub fn msg_s(&self) -> &str {
         match &self.msg {
-            Some(m) => &m,
+            Some(m) => m,
             None => "GENERIC",
         }
     }
